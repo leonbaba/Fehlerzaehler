@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fehlerzähler</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #f5f5f5;
+    }
+    h1 { text-align: center; }
+    .section { margin-bottom: 2rem; }
+    .controls button {
+      margin: 0.25rem;
+      padding: 0.5rem 1rem;
+    }
+    .stats, .video-display, .punishment-display, .settings {
+      padding: 1rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .slot {
+      font-size: 2rem;
+      text-align: center;
+      animation: slot 1s ease-in-out;
+    }
+    @keyframes slot {
+      0% { transform: translateY(-100%); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🎯 Fehlerzähler</h1>
+  <div class="section video-display">
+    <h2>Aktuelles Video</h2>
+    <div id="videoName">Ziehe ein Video...</div>
+    <button onclick="drawVideo()">🎥 Video ziehen</button>
+  </div>
+
+  <div class="section controls">
+    <h2>Fehler hinzufügen</h2>
+    <div id="errorButtons"></div>
+  </div>
+
+  <div class="section stats">
+    <h2>Statistiken</h2>
+    <div>Fehler gesamt: <span id="totalErrors">0</span></div>
+    <div>Punkte: <span id="points">0</span></div>
+    <div>Strafen: <span id="punishments">0</span></div>
+    <div>Videos abgeschlossen: <span id="rounds">0</span> / <span id="totalVideos">0</span></div>
+  </div>
+
+  <div class="section punishment-display">
+    <h2>Strafe</h2>
+    <div class="slot" id="punishmentDisplay">-</div>
+  </div>
+
+  <div class="section settings">
+    <h2>Einstellungen</h2>
+    <button onclick="resetSession()">🔁 Session zurücksetzen</button>
+  </div>
+
+  <script>
+    const defaultErrors = [
+      { name: 'Versprochen', points: 5 },
+      { name: 'Versprochen 2', points: 3 },
+      { name: 'Füllwort', points: 2 },
+      { name: 'Pause', points: 1 }
+    ];
+
+    const defaultPunishments = [
+      '1 Video extra',
+      '30 Sek. Plank',
+      '20 Kniebeugen',
+      'Nicht reden für 1 Min.',
+      'TikTok-Tanz',
+      'Kalt duschen'
+    ];
+
+    const defaultVideos = Array.from({ length: 32 }, (_, i) => `${i + 1}. Video`);
+
+    let state = {
+      videos: [...defaultVideos],
+      remainingVideos: [...defaultVideos],
+      errors: defaultErrors,
+      punishments: defaultPunishments,
+      totalErrors: 0,
+      points: 0,
+      punishmentCount: 0,
+      rounds: 0
+    };
+
+    function saveState() {
+      localStorage.setItem('fehlerAppState', JSON.stringify(state));
+    }
+
+    function loadState() {
+      const saved = localStorage.getItem('fehlerAppState');
+      if (saved) state = JSON.parse(saved);
+    }
+
+    function updateUI() {
+      document.getElementById('totalErrors').textContent = state.totalErrors;
+      document.getElementById('points').textContent = state.points;
+      document.getElementById('punishments').textContent = state.punishmentCount;
+      document.getElementById('rounds').textContent = state.rounds;
+      document.getElementById('totalVideos').textContent = state.videos.length;
+      document.getElementById('errorButtons').innerHTML = '';
+      state.errors.forEach((err, i) => {
+        const btn = document.createElement('button');
+        btn.textContent = `${err.name} (+${err.points})`;
+        btn.onclick = () => addError(err.points);
+        document.getElementById('errorButtons').appendChild(btn);
+      });
+    }
+
+    function addError(points) {
+      state.totalErrors++;
+      state.points += points;
+      if (state.points >= 10) {
+        triggerPunishment();
+        state.points -= 10;
+      }
+      saveState();
+      updateUI();
+    }
+
+    function triggerPunishment() {
+      const rand = Math.floor(Math.random() * state.punishments.length);
+      const chosen = state.punishments[rand];
+      document.getElementById('punishmentDisplay').textContent = chosen;
+      state.punishmentCount++;
+    }
+
+    function drawVideo() {
+      if (state.remainingVideos.length === 0) {
+        alert('Alle Videos durch!');
+        return;
+      }
+      const rand = Math.floor(Math.random() * state.remainingVideos.length);
+      const video = state.remainingVideos.splice(rand, 1)[0];
+      document.getElementById('videoName').textContent = video;
+      state.rounds++;
+      saveState();
+      updateUI();
+    }
+
+    function resetSession() {
+      if (!confirm('Alles zurücksetzen?')) return;
+      state.remainingVideos = [...state.videos];
+      state.totalErrors = 0;
+      state.points = 0;
+      state.punishmentCount = 0;
+      state.rounds = 0;
+      document.getElementById('videoName').textContent = 'Ziehe ein Video...';
+      document.getElementById('punishmentDisplay').textContent = '-';
+      saveState();
+      updateUI();
+    }
+
+    loadState();
+    updateUI();
+  </script>
+</body>
+</html>
