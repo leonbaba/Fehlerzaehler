@@ -1,171 +1,495 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fehlerzähler</title>
-  <link rel="manifest" href="manifest.json">
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding: 1rem;
-      background: #f5f5f5;
-    }
-    h1 { text-align: center; }
-    .section { margin-bottom: 2rem; }
-    .controls button {
-      margin: 0.25rem;
-      padding: 0.5rem 1rem;
-    }
-    .stats, .video-display, .punishment-display, .settings {
-      padding: 1rem;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-    }
-    .slot {
-      font-size: 2rem;
-      text-align: center;
-      animation: slot 1s ease-in-out;
-    }
-    @keyframes slot {
-      0% { transform: translateY(-100%); opacity: 0; }
-      100% { transform: translateY(0); opacity: 1; }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fehlerzähler App mit Einstellungen</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0; padding: 0; background: #f0f0f0;
+  }
+  header {
+    background: #007acc; color: white; padding: 1em;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  header h1 { margin: 0; font-size: 1.3em; }
+  button {
+    background: #005a9e; border: none; color: white;
+    padding: 0.5em 1em; font-size: 1em; cursor: pointer;
+    border-radius: 3px;
+  }
+  button:hover {
+    background: #004a82;
+  }
+  main {
+    padding: 1em;
+    max-width: 600px;
+    margin: auto;
+  }
+
+  /* Einstellungen-Seitenleiste */
+  #settingsOverlay {
+    position: fixed; top: 0; right: -400px; width: 400px; height: 100%;
+    background: white; box-shadow: -2px 0 10px rgba(0,0,0,0.3);
+    transition: right 0.3s ease;
+    display: flex; flex-direction: column;
+    z-index: 1000;
+  }
+  #settingsOverlay.open {
+    right: 0;
+  }
+  #settingsHeader {
+    background: #007acc; color: white; padding: 1em;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  #settingsHeader h2 {
+    margin: 0; font-size: 1.2em;
+  }
+  #settingsContent {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1em;
+  }
+  .tab-buttons {
+    display: flex;
+    border-bottom: 1px solid #ccc;
+    margin-bottom: 1em;
+  }
+  .tab-buttons button {
+    flex: 1;
+    background: #eee;
+    border: none;
+    padding: 0.5em;
+    font-weight: bold;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+  }
+  .tab-buttons button.active {
+    background: white;
+    border-bottom: 3px solid #007acc;
+  }
+
+  .list-editor {
+    margin-bottom: 1em;
+  }
+  .list-editor label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 0.3em;
+  }
+  .list-editor input[type="text"],
+  .list-editor input[type="number"] {
+    width: 100%;
+    padding: 0.4em;
+    margin-bottom: 0.5em;
+    box-sizing: border-box;
+  }
+  .list-editor table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1em;
+  }
+  .list-editor table th, .list-editor table td {
+    border: 1px solid #ccc;
+    padding: 0.3em 0.5em;
+    text-align: left;
+  }
+  .list-editor table th {
+    background: #eee;
+  }
+  .list-editor button {
+    margin-right: 0.3em;
+    padding: 0.3em 0.6em;
+    font-size: 0.9em;
+  }
+
+  /* Weitere App Styles */
+  label { display: block; margin-top: 1em; font-weight: bold; }
+  input[type=number] { width: 100px; padding: 0.3em; margin-top: 0.2em; }
+  .output { margin-top: 1em; font-weight: bold; }
+
+</style>
 </head>
 <body>
-  <h1>🎯 Fehlerzähler</h1>
-  <div class="section video-display">
-    <h2>Aktuelles Video</h2>
-    <div id="videoName">Ziehe ein Video...</div>
-    <button onclick="drawVideo()">🎥 Video ziehen</button>
-  </div>
 
-  <div class="section controls">
-    <h2>Fehler hinzufügen</h2>
-    <div id="errorButtons"></div>
-  </div>
+<header>
+  <h1>Fehlerzähler App</h1>
+  <button id="openSettingsBtn">Einstellungen</button>
+</header>
 
-  <div class="section stats">
-    <h2>Statistiken</h2>
-    <div>Fehler gesamt: <span id="totalErrors">0</span></div>
-    <div>Punkte: <span id="points">0</span></div>
-    <div>Strafen: <span id="punishments">0</span></div>
-    <div>Videos abgeschlossen: <span id="rounds">0</span> / <span id="totalVideos">0</span></div>
-  </div>
+<main>
+  <label for="videoSelect">Video wählen:</label>
+  <select id="videoSelect"></select>
 
-  <div class="section punishment-display">
-    <h2>Strafe</h2>
-    <div class="slot" id="punishmentDisplay">-</div>
-  </div>
+  <label for="errorPoints">Fehlerpunkte eingeben:</label>
+  <input type="number" id="errorPoints" min="0" value="0" />
 
-  <div class="section settings">
+  <button id="addPointsBtn">Punkte hinzufügen</button>
+
+  <div class="output" id="pointsDisplay">Punkte: 0</div>
+  <div class="output" id="punishmentDisplay"></div>
+</main>
+
+<!-- Einstellungen Sidebar -->
+<div id="settingsOverlay">
+  <div id="settingsHeader">
     <h2>Einstellungen</h2>
-    <button onclick="resetSession()">🔁 Session zurücksetzen</button>
+    <button id="closeSettingsBtn">Schließen</button>
   </div>
+  <div class="tab-buttons">
+    <button class="tab-btn active" data-tab="videosTab">Videos</button>
+    <button class="tab-btn" data-tab="errorsTab">Fehler</button>
+    <button class="tab-btn" data-tab="punishmentsTab">Strafen</button>
+  </div>
+  <div id="settingsContent">
+    <!-- Videos -->
+    <div id="videosTab" class="tab-content">
+      <div class="list-editor">
+        <table id="videosTable">
+          <thead>
+            <tr><th>Nummer</th><th>Name</th><th>Aktion</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <input type="number" id="newVideoNumber" placeholder="Nummer" min="1" />
+        <input type="text" id="newVideoName" placeholder="Name" />
+        <button id="addVideoBtn">Video hinzufügen</button>
+      </div>
+    </div>
 
-  <script>
-    const defaultErrors = [
-      { name: 'Versprochen', points: 5 },
-      { name: 'Versprochen 2', points: 3 },
-      { name: 'Füllwort', points: 2 },
-      { name: 'Pause', points: 1 }
-    ];
+    <!-- Fehler -->
+    <div id="errorsTab" class="tab-content" style="display:none;">
+      <div class="list-editor">
+        <table id="errorsTable">
+          <thead>
+            <tr><th>Beschreibung</th><th>Punkte</th><th>Aktion</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <input type="text" id="newErrorDesc" placeholder="Fehlerbeschreibung" />
+        <input type="number" id="newErrorPoints" placeholder="Punkte" min="1" />
+        <button id="addErrorBtn">Fehler hinzufügen</button>
+      </div>
+    </div>
 
-    const defaultPunishments = [
-      '1 Video extra',
-      '30 Sek. Plank',
-      '20 Kniebeugen',
-      'Nicht reden für 1 Min.',
-      'TikTok-Tanz',
-      'Kalt duschen'
-    ];
+    <!-- Strafen -->
+    <div id="punishmentsTab" class="tab-content" style="display:none;">
+      <div class="list-editor">
+        <table id="punishmentsTable">
+          <thead>
+            <tr><th>Strafe</th><th>Wildcard?</th><th>Aktion</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <input type="text" id="newPunishmentText" placeholder="Strafe" />
+        <label><input type="checkbox" id="newPunishmentWildcard" /> Wildcard</label><br/>
+        <button id="addPunishmentBtn">Strafe hinzufügen</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-    const defaultVideos = Array.from({ length: 32 }, (_, i) => `${i + 1}. Video`);
+<script>
+(() => {
+  // Keys für LocalStorage
+  const STORAGE_KEYS = {
+    videos: 'fz_videos',
+    errors: 'fz_errors',
+    punishments: 'fz_punishments',
+    points: 'fz_points'
+  };
 
-    let state = {
-      videos: [...defaultVideos],
-      remainingVideos: [...defaultVideos],
-      errors: defaultErrors,
-      punishments: defaultPunishments,
-      totalErrors: 0,
-      points: 0,
-      punishmentCount: 0,
-      rounds: 0
-    };
+  // Standardwerte
+  const DEFAULT_VIDEOS = [
+    { number: 1, name: "Masha & Merle" },
+    { number: 2, name: "Video 2" },
+    { number: 3, name: "Video 3" },
+  ];
+  const DEFAULT_ERRORS = [
+    { desc: "Fehler 1", points: 1 },
+    { desc: "Fehler 2", points: 2 },
+    { desc: "Fehler 3", points: 3 },
+  ];
+  const DEFAULT_PUNISHMENTS = [
+    { text: "Strafe 1", wildcard: false },
+    { text: "1 Video extra", wildcard: true },
+    { text: "Strafe 3", wildcard: false },
+  ];
 
-    function saveState() {
-      localStorage.setItem('fehlerAppState', JSON.stringify(state));
+  // Zustand
+  let videos = [];
+  let errors = [];
+  let punishments = [];
+  let points = 0;
+
+  // UI Elemente
+  const videoSelect = document.getElementById('videoSelect');
+  const errorPointsInput = document.getElementById('errorPoints');
+  const addPointsBtn = document.getElementById('addPointsBtn');
+  const pointsDisplay = document.getElementById('pointsDisplay');
+  const punishmentDisplay = document.getElementById('punishmentDisplay');
+
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const openSettingsBtn = document.getElementById('openSettingsBtn');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  // Tabellen Körper
+  const videosTableBody = document.querySelector('#videosTable tbody');
+  const errorsTableBody = document.querySelector('#errorsTable tbody');
+  const punishmentsTableBody = document.querySelector('#punishmentsTable tbody');
+
+  // Neue Einträge Inputs und Buttons
+  const newVideoNumberInput = document.getElementById('newVideoNumber');
+  const newVideoNameInput = document.getElementById('newVideoName');
+  const addVideoBtn = document.getElementById('addVideoBtn');
+
+  const newErrorDescInput = document.getElementById('newErrorDesc');
+  const newErrorPointsInput = document.getElementById('newErrorPoints');
+  const addErrorBtn = document.getElementById('addErrorBtn');
+
+  const newPunishmentTextInput = document.getElementById('newPunishmentText');
+  const newPunishmentWildcardInput = document.getElementById('newPunishmentWildcard');
+  const addPunishmentBtn = document.getElementById('addPunishmentBtn');
+
+  // Lade Daten oder setze Defaults
+  function loadData() {
+    videos = JSON.parse(localStorage.getItem(STORAGE_KEYS.videos)) || DEFAULT_VIDEOS;
+    errors = JSON.parse(localStorage.getItem(STORAGE_KEYS.errors)) || DEFAULT_ERRORS;
+    punishments = JSON.parse(localStorage.getItem(STORAGE_KEYS.punishments)) || DEFAULT_PUNISHMENTS;
+    points = parseInt(localStorage.getItem(STORAGE_KEYS.points)) || 0;
+  }
+  // Speichere Daten
+  function saveData() {
+    localStorage.setItem(STORAGE_KEYS.videos, JSON.stringify(videos));
+    localStorage.setItem(STORAGE_KEYS.errors, JSON.stringify(errors));
+    localStorage.setItem(STORAGE_KEYS.punishments, JSON.stringify(punishments));
+    localStorage.setItem(STORAGE_KEYS.points, points.toString());
+  }
+
+  // UI aktualisieren
+  function updateVideoSelect() {
+    videoSelect.innerHTML = '';
+    videos.forEach(v => {
+      const option = document.createElement('option');
+      option.value = v.number;
+      option.textContent = `${v.number}. ${v.name}`;
+      videoSelect.appendChild(option);
+    });
+  }
+  function updatePointsDisplay() {
+    pointsDisplay.textContent = `Punkte: ${points}`;
+  }
+  function updatePunishmentDisplay() {
+    if (points >= 10) {
+      // Strafe auswürfeln, z.B. zufällig eine Strafe
+      const p = punishments[Math.floor(Math.random() * punishments.length)];
+      punishmentDisplay.textContent = `Strafe: ${p.text} ${p.wildcard ? '(Wildcard)' : ''}`;
+    } else {
+      punishmentDisplay.textContent = '';
     }
+  }
 
-    function loadState() {
-      const saved = localStorage.getItem('fehlerAppState');
-      if (saved) state = JSON.parse(saved);
-    }
+  // Tabellen füllen (Videos, Fehler, Strafen)
+  function refreshTables() {
+    // Videos
+    videosTableBody.innerHTML = '';
+    videos.forEach((v, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="number" value="${v.number}" min="1" data-index="${i}" class="video-number"></td>
+        <td><input type="text" value="${v.name}" data-index="${i}" class="video-name"></td>
+        <td><button data-index="${i}" class="del-video-btn">Löschen</button></td>
+      `;
+      videosTableBody.appendChild(tr);
+    });
+    // Fehler
+    errorsTableBody.innerHTML = '';
+    errors.forEach((e, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" value="${e.desc}" data-index="${i}" class="error-desc"></td>
+        <td><input type="number" value="${e.points}" min="1" data-index="${i}" class="error-points"></td>
+        <td><button data-index="${i}" class="del-error-btn">Löschen</button></td>
+      `;
+      errorsTableBody.appendChild(tr);
+    });
+    // Strafen
+    punishmentsTableBody.innerHTML = '';
+    punishments.forEach((p, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="text" value="${p.text}" data-index="${i}" class="punishment-text"></td>
+        <td><input type="checkbox" ${p.wildcard ? 'checked' : ''} data-index="${i}" class="punishment-wildcard"></td>
+        <td><button data-index="${i}" class="del-punishment-btn">Löschen</button></td>
+      `;
+      punishmentsTableBody.appendChild(tr);
+    });
+  }
 
-    function updateUI() {
-      document.getElementById('totalErrors').textContent = state.totalErrors;
-      document.getElementById('points').textContent = state.points;
-      document.getElementById('punishments').textContent = state.punishmentCount;
-      document.getElementById('rounds').textContent = state.rounds;
-      document.getElementById('totalVideos').textContent = state.videos.length;
-      document.getElementById('errorButtons').innerHTML = '';
-      state.errors.forEach((err, i) => {
-        const btn = document.createElement('button');
-        btn.textContent = `${err.name} (+${err.points})`;
-        btn.onclick = () => addError(err.points);
-        document.getElementById('errorButtons').appendChild(btn);
-      });
-    }
-
-    function addError(points) {
-      state.totalErrors++;
-      state.points += points;
-      if (state.points >= 10) {
-        triggerPunishment();
-        state.points -= 10;
+  // Event-Handler für Eingaben in Tabellen (update state)
+  function setupTableInputListeners() {
+    // Videos Nummer
+    videosTableBody.addEventListener('input', e => {
+      if(e.target.classList.contains('video-number')) {
+        const idx = e.target.dataset.index;
+        let val = parseInt(e.target.value);
+        if(isNaN(val) || val < 1) val = 1;
+        videos[idx].number = val;
+        saveData();
+        updateVideoSelect();
       }
-      saveState();
-      updateUI();
-    }
-
-    function triggerPunishment() {
-      const rand = Math.floor(Math.random() * state.punishments.length);
-      const chosen = state.punishments[rand];
-      document.getElementById('punishmentDisplay').textContent = chosen;
-      state.punishmentCount++;
-    }
-
-    function drawVideo() {
-      if (state.remainingVideos.length === 0) {
-        alert('Alle Videos durch!');
-        return;
+      if(e.target.classList.contains('video-name')) {
+        const idx = e.target.dataset.index;
+        videos[idx].name = e.target.value;
+        saveData();
+        updateVideoSelect();
       }
-      const rand = Math.floor(Math.random() * state.remainingVideos.length);
-      const video = state.remainingVideos.splice(rand, 1)[0];
-      document.getElementById('videoName').textContent = video;
-      state.rounds++;
-      saveState();
-      updateUI();
-    }
+    });
+    // Fehler
+    errorsTableBody.addEventListener('input', e => {
+      if(e.target.classList.contains('error-desc')) {
+        const idx = e.target.dataset.index;
+        errors[idx].desc = e.target.value;
+        saveData();
+      }
+      if(e.target.classList.contains('error-points')) {
+        const idx = e.target.dataset.index;
+        let val = parseInt(e.target.value);
+        if(isNaN(val) || val < 1) val = 1;
+        errors[idx].points = val;
+        saveData();
+      }
+    });
+    // Strafen
+    punishmentsTableBody.addEventListener('input', e => {
+      if(e.target.classList.contains('punishment-text')) {
+        const idx = e.target.dataset.index;
+        punishments[idx].text = e.target.value;
+        saveData();
+      }
+    });
+    punishmentsTableBody.addEventListener('change', e => {
+      if(e.target.classList.contains('punishment-wildcard')) {
+        const idx = e.target.dataset.index;
+        punishments[idx].wildcard = e.target.checked;
+        saveData();
+      }
+    });
+  }
 
-    function resetSession() {
-      if (!confirm('Alles zurücksetzen?')) return;
-      state.remainingVideos = [...state.videos];
-      state.totalErrors = 0;
-      state.points = 0;
-      state.punishmentCount = 0;
-      state.rounds = 0;
-      document.getElementById('videoName').textContent = 'Ziehe ein Video...';
-      document.getElementById('punishmentDisplay').textContent = '-';
-      saveState();
-      updateUI();
-    }
+  // Löschen Buttons
+  function setupDeleteButtons() {
+    // Videos
+    videosTableBody.addEventListener('click', e => {
+      if(e.target.classList.contains('del-video-btn')) {
+        const idx = e.target.dataset.index;
+        videos.splice(idx, 1);
+        saveData();
+        refreshTables();
+        updateVideoSelect();
+      }
+    });
+    // Fehler
+    errorsTableBody.addEventListener('click', e => {
+      if(e.target.classList.contains('del-error-btn')) {
+        const idx = e.target.dataset.index;
+        errors.splice(idx, 1);
+        saveData();
+        refreshTables();
+      }
+    });
+    // Strafen
+    punishmentsTableBody.addEventListener('click', e => {
+      if(e.target.classList.contains('del-punishment-btn')) {
+        const idx = e.target.dataset.index;
+        punishments.splice(idx, 1);
+        saveData();
+        refreshTables();
+      }
+    });
+  }
 
-    loadState();
-    updateUI();
-  </script>
+  // Neue Einträge hinzufügen
+  addVideoBtn.addEventListener('click', () => {
+    const num = parseInt(newVideoNumberInput.value);
+    const name = newVideoNameInput.value.trim();
+    if(!num || !name) return alert('Bitte Nummer und Namen eingeben');
+    videos.push({ number: num, name });
+    newVideoNumberInput.value = '';
+    newVideoNameInput.value = '';
+    saveData();
+    refreshTables();
+    updateVideoSelect();
+  });
+  addErrorBtn.addEventListener('click', () => {
+    const desc = newErrorDescInput.value.trim();
+    const pts = parseInt(newErrorPointsInput.value);
+    if(!desc || !pts || pts < 1) return alert('Bitte Beschreibung und Punkte (≥1) eingeben');
+    errors.push({ desc, points: pts });
+    newErrorDescInput.value = '';
+    newErrorPointsInput.value = '';
+    saveData();
+    refreshTables();
+  });
+  addPunishmentBtn.addEventListener('click', () => {
+    const text = newPunishmentTextInput.value.trim();
+    const wildcard = newPunishmentWildcardInput.checked;
+    if(!text) return alert('Bitte eine Strafe eingeben');
+    punishments.push({ text, wildcard });
+    newPunishmentTextInput.value = '';
+    newPunishmentWildcardInput.checked = false;
+    saveData();
+    refreshTables();
+  });
+
+  // Tab Umschalten
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      tabContents.forEach(c => c.style.display = c.id === tab ? 'block' : 'none');
+    });
+  });
+
+  // Einstellungen öffnen/schließen
+  openSettingsBtn.addEventListener('click', () => {
+    settingsOverlay.classList.add('open');
+  });
+  closeSettingsBtn.addEventListener('click', () => {
+    settingsOverlay.classList.remove('open');
+  });
+
+  // Punkte hinzufügen
+  addPointsBtn.addEventListener('click', () => {
+    const val = parseInt(errorPointsInput.value);
+    if(isNaN(val) || val <= 0) return alert('Bitte eine positive Punktzahl eingeben');
+    // Punkte addieren, wenn über 10 -> wrap around auf 1 + Rest (nicht null)
+    points += val;
+    if(points > 10) points = 1 + (points - 10 - 1);
+    saveData();
+    updatePointsDisplay();
+    updatePunishmentDisplay();
+  });
+
+  // Initialisieren
+  function init() {
+    loadData();
+    refreshTables();
+    updateVideoSelect();
+    updatePointsDisplay();
+    updatePunishmentDisplay();
+    setupTableInputListeners();
+    setupDeleteButtons();
+  }
+  init();
+
+})();
+</script>
+
 </body>
 </html>
