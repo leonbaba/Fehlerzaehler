@@ -3,351 +3,196 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Fehlerzähler mit Strafen & Einstellungen</title>
+<title>Fehlerzähler</title>
 <style>
-  body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 10px; background: #f0f0f0; }
-  h1, h2 { text-align: center; }
-  button { margin: 5px; padding: 8px 15px; font-size: 16px; cursor: pointer; }
-  .section { background: white; padding: 15px; margin-bottom: 20px; border-radius: 6px; box-shadow: 0 0 5px #ccc; }
-  label { display: block; margin-top: 8px; font-weight: bold; }
-  input[type=text], input[type=number], textarea { width: 100%; padding: 6px; margin-top: 4px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; }
-  ul { list-style-type: none; padding: 0; }
-  li { padding: 5px 0; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
-  .list-controls button { margin-left: 5px; }
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  textarea { width: 100%; height: 100px; }
+  button { margin: 5px 0; }
   .hidden { display: none; }
-  nav { text-align: center; margin-bottom: 20px; }
-  nav button { margin: 0 10px; }
-  #output { white-space: pre-wrap; background: #eee; padding: 10px; border-radius: 6px; height: 150px; overflow-y: auto; }
+  #settings { margin-top: 30px; border-top: 1px solid #ccc; padding-top: 20px; }
+  label { font-weight: bold; }
 </style>
 </head>
 <body>
+<h1>Fehlerzähler</h1>
 
-<h1>Fehlerzähler & Strafen</h1>
-
-<nav>
-  <button id="btn-session">Session</button>
-  <button id="btn-settings">Einstellungen</button>
-</nav>
-
-<div id="session-view" class="section">
-  <h2>Session</h2>
-  <p><b>Aktuelles Video:</b> <span id="current-video">–</span></p>
-  <p><b>Fehlerpunkte:</b> <span id="points">0</span></p>
-  
-  <label for="error-select">Fehler hinzufügen:</label>
-  <select id="error-select"></select>
-  <button id="add-error-btn">Fehler hinzufügen</button>
-  
-  <button id="next-video-btn" style="margin-top:15px;">Nächstes Video ziehen</button>
-
-  <h3>Vergebene Strafen:</h3>
-  <ul id="penalties-list"></ul>
+<!-- Hauptbereich -->
+<div>
+  <h2>Aktuelle Session</h2>
+  <div>
+    <label for="videoSelect">Video wählen:</label><br />
+    <select id="videoSelect"></select>
+  </div>
+  <div>
+    <label for="errorPoints">Fehlerpunkte eingeben:</label><br />
+    <input type="number" id="errorPoints" min="0" value="0" />
+  </div>
+  <button id="addPointsBtn">Punkte hinzufügen</button>
+  <p>Gesamtpunkte: <span id="totalPoints">0</span></p>
+  <p id="punishmentMsg"></p>
+  <button id="endSessionBtn">Session beenden</button>
 </div>
 
-<div id="settings-view" class="section hidden">
+<!-- Einstellungen -->
+<div id="settings">
   <h2>Einstellungen</h2>
-  
+
   <div>
-    <h3>Videos bearbeiten</h3>
-    <ul id="videos-list"></ul>
-    <button id="add-video-btn">Video hinzufügen</button>
-  </div>
-  
-  <div>
-    <h3>Fehler bearbeiten</h3>
-    <ul id="errors-list"></ul>
-    <button id="add-error-setting-btn">Fehler hinzufügen</button>
-  </div>
-  
-  <div>
-    <h3>Strafen bearbeiten</h3>
-    <ul id="penalties-list-settings"></ul>
-    <button id="add-penalty-btn">Strafe hinzufügen</button>
+    <label for="videoList">Videos (je eine Zeile: "Nummer. Name"):</label><br />
+    <textarea id="videoList"></textarea>
   </div>
 
-  <button id="save-settings-btn" style="margin-top:20px; background:#4caf50; color:white;">Einstellungen speichern</button>
+  <div>
+    <label for="errorList">Fehler (je eine Zeile: "Name;Punkte"):</label><br />
+    <textarea id="errorList"></textarea>
+  </div>
+
+  <div>
+    <label for="punishmentList">Strafen (je eine Zeile):</label><br />
+    <textarea id="punishmentList"></textarea>
+  </div>
+
+  <button id="saveSettingsBtn">Einstellungen speichern</button>
 </div>
 
 <script>
-(() => {
-  // Keys für LocalStorage
-  const LS_VIDEOS = 'fz_videos';
-  const LS_ERRORS = 'fz_errors';
-  const LS_PENALTIES = 'fz_penalties';
-
   // Default-Daten
   const defaultVideos = [
-    {id:1, name:'1. Masha & Merle'},
-    {id:2, name:'2. Video 2'},
-    {id:3, name:'3. Video 3'},
+    "1. Masha & Merle",
+    "2. Video 2",
+    "3. Video 3"
   ];
   const defaultErrors = [
-    {id:1, name:'Fehler A', points:1},
-    {id:2, name:'Fehler B', points:3},
-    {id:3, name:'Fehler C', points:6},
+    "Fehler A;1",
+    "Fehler B;2"
   ];
-  const defaultPenalties = [
-    {id:1, name:'Strafe 1'},
-    {id:2, name:'Strafe 2'},
-    {id:3, name:'Strafe 3'},
+  const defaultPunishments = [
+    "Strafe 1",
+    "Strafe 2",
+    "Strafe 3"
   ];
 
-  // State
-  let videos = [];
-  let errors = [];
-  let penalties = [];
+  // DOM-Elemente
+  const videoSelect = document.getElementById("videoSelect");
+  const errorPointsInput = document.getElementById("errorPoints");
+  const addPointsBtn = document.getElementById("addPointsBtn");
+  const totalPointsSpan = document.getElementById("totalPoints");
+  const punishmentMsg = document.getElementById("punishmentMsg");
+  const endSessionBtn = document.getElementById("endSessionBtn");
 
-  let currentVideo = null;
-  let points = 0;
-  let assignedPenalties = [];
+  const videoListTextarea = document.getElementById("videoList");
+  const errorListTextarea = document.getElementById("errorList");
+  const punishmentListTextarea = document.getElementById("punishmentList");
+  const saveSettingsBtn = document.getElementById("saveSettingsBtn");
 
-  // Views
-  const sessionView = document.getElementById('session-view');
-  const settingsView = document.getElementById('settings-view');
-
-  // UI Elements
-  const currentVideoSpan = document.getElementById('current-video');
-  const pointsSpan = document.getElementById('points');
-  const errorSelect = document.getElementById('error-select');
-  const addErrorBtn = document.getElementById('add-error-btn');
-  const nextVideoBtn = document.getElementById('next-video-btn');
-  const penaltiesList = document.getElementById('penalties-list');
-
-  const videosList = document.getElementById('videos-list');
-  const errorsList = document.getElementById('errors-list');
-  const penaltiesListSettings = document.getElementById('penalties-list-settings');
-
-  const addVideoBtn = document.getElementById('add-video-btn');
-  const addErrorSettingBtn = document.getElementById('add-error-setting-btn');
-  const addPenaltyBtn = document.getElementById('add-penalty-btn');
-  const saveSettingsBtn = document.getElementById('save-settings-btn');
-
-  const btnSession = document.getElementById('btn-session');
-  const btnSettings = document.getElementById('btn-settings');
-
-  // Hilfsfunktionen LocalStorage laden & speichern
-  function loadOrDefault(key, defaultVal) {
-    try {
-      const raw = localStorage.getItem(key);
-      if(!raw) return defaultVal;
-      return JSON.parse(raw);
-    } catch {
-      return defaultVal;
-    }
-  }
-  function save(key, data) {
-    localStorage.setItem(key, JSON.stringify(data));
-  }
-
-  // Init: Daten laden
-  function initData() {
-    videos = loadOrDefault(LS_VIDEOS, defaultVideos);
-    errors = loadOrDefault(LS_ERRORS, defaultErrors);
-    penalties = loadOrDefault(LS_PENALTIES, defaultPenalties);
-  }
-
-  // UI-Updates
-
-  // Session UI aktualisieren
-  function updateSessionUI() {
-    currentVideoSpan.textContent = currentVideo ? currentVideo.name : '–';
-    pointsSpan.textContent = points;
-
-    // Fehlerselect befüllen
-    errorSelect.innerHTML = '';
-    errors.forEach(e => {
-      const option = document.createElement('option');
-      option.value = e.id;
-      option.textContent = `${e.name} (${e.points} Punkte)`;
-      errorSelect.appendChild(option);
-    });
-
-    // Vergebene Strafen anzeigen
-    penaltiesList.innerHTML = '';
-    assignedPenalties.forEach(p => {
-      const li = document.createElement('li');
-      li.textContent = p.name;
-      penaltiesList.appendChild(li);
-    });
-  }
-
-  // Settings UI aktualisieren
-  function updateSettingsUI() {
-    // Videos
-    videosList.innerHTML = '';
-    videos.forEach(v => {
-      videosList.appendChild(createEditableListItem(v, 'video'));
-    });
-
-    // Fehler
-    errorsList.innerHTML = '';
-    errors.forEach(e => {
-      errorsList.appendChild(createEditableListItem(e, 'error'));
-    });
-
-    // Strafen
-    penaltiesListSettings.innerHTML = '';
-    penalties.forEach(p => {
-      penaltiesListSettings.appendChild(createEditableListItem(p, 'penalty'));
-    });
-  }
-
-  // Listenelement mit Editierfunktion erstellen
-  function createEditableListItem(item, type) {
-    const li = document.createElement('li');
-
-    // Input Felder je nach Typ
-    if(type === 'video') {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.value = item.name;
-      input.style.flex = '1';
-      input.onchange = () => {
-        item.name = input.value;
-      };
-      li.appendChild(input);
-    } else if(type === 'error') {
-      const nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.value = item.name;
-      nameInput.style.flex = '2';
-      nameInput.onchange = () => { item.name = nameInput.value; };
-
-      const pointsInput = document.createElement('input');
-      pointsInput.type = 'number';
-      pointsInput.min = '1';
-      pointsInput.value = item.points;
-      pointsInput.style.width = '60px';
-      pointsInput.style.marginLeft = '10px';
-      pointsInput.onchange = () => {
-        let val = parseInt(pointsInput.value);
-        if(isNaN(val) || val < 1) val = 1;
-        item.points = val;
-        pointsInput.value = val;
-      };
-
-      li.style.display = 'flex';
-      li.style.alignItems = 'center';
-      li.appendChild(nameInput);
-      li.appendChild(pointsInput);
-    } else if(type === 'penalty') {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.value = item.name;
-      input.style.flex = '1';
-      input.onchange = () => {
-        item.name = input.value;
-      };
-      li.appendChild(input);
-    }
-
-    // Löschen Button
-    const delBtn = document.createElement('button');
-    delBtn.textContent = 'Löschen';
-    delBtn.onclick = () => {
-      if(confirm('Eintrag wirklich löschen?')) {
-        if(type === 'video') {
-          videos = videos.filter(v => v.id !== item.id);
-          updateSettingsUI();
-        } else if(type === 'error') {
-          errors = errors.filter(e => e.id !== item.id);
-          updateSettingsUI();
-        } else if(type === 'penalty') {
-          penalties = penalties.filter(p => p.id !== item.id);
-          updateSettingsUI();
-        }
-      }
+  // Daten im Speicher laden oder Standard
+  function loadData() {
+    const videos = localStorage.getItem("videos");
+    const errors = localStorage.getItem("errors");
+    const punishments = localStorage.getItem("punishments");
+    return {
+      videos: videos ? JSON.parse(videos) : defaultVideos,
+      errors: errors ? JSON.parse(errors) : defaultErrors,
+      punishments: punishments ? JSON.parse(punishments) : defaultPunishments,
     };
-    li.appendChild(delBtn);
-
-    return li;
   }
 
-  // Neue Einträge hinzufügen
-  addVideoBtn.onclick = () => {
-    const maxId = videos.length > 0 ? Math.max(...videos.map(v => v.id)) : 0;
-    videos.push({id: maxId+1, name:'Neues Video'});
-    updateSettingsUI();
-  };
-  addErrorSettingBtn.onclick = () => {
-    const maxId = errors.length > 0 ? Math.max(...errors.map(e => e.id)) : 0;
-    errors.push({id: maxId+1, name:'Neuer Fehler', points:1});
-    updateSettingsUI();
-  };
-  addPenaltyBtn.onclick = () => {
-    const maxId = penalties.length > 0 ? Math.max(...penalties.map(p => p.id)) : 0;
-    penalties.push({id: maxId+1, name:'Neue Strafe'});
-    updateSettingsUI();
-  };
+  // Daten speichern
+  function saveData(videos, errors, punishments) {
+    localStorage.setItem("videos", JSON.stringify(videos));
+    localStorage.setItem("errors", JSON.stringify(errors));
+    localStorage.setItem("punishments", JSON.stringify(punishments));
+  }
 
-  // Einstellungen speichern
-  saveSettingsBtn.onclick = () => {
-    save(LS_VIDEOS, videos);
-    save(LS_ERRORS, errors);
-    save(LS_PENALTIES, penalties);
-    alert('Einstellungen gespeichert!');
-    updateSessionUI();
-  };
+  // Videos in Select laden
+  function populateVideoSelect(videos) {
+    videoSelect.innerHTML = "";
+    videos.forEach(v => {
+      const option = document.createElement("option");
+      option.value = v;
+      option.textContent = v;
+      videoSelect.appendChild(option);
+    });
+  }
 
-  // Fehler hinzufügen in Session
-  addErrorBtn.onclick = () => {
-    const errId = parseInt(errorSelect.value);
-    const err = errors.find(e => e.id === errId);
-    if(!err) return;
-    points += err.points;
-    // Punkte bei >10 auf (Punkte-10)+1 setzen, also zyklisch ab 1
-    if(points > 10) points = (points - 10) + 1;
+  // Einstellungen Textareas füllen
+  function fillSettingsTextareas(videos, errors, punishments) {
+    videoListTextarea.value = videos.join("\n");
+    errorListTextarea.value = errors.map(e => e.includes(";") ? e : e+";1").join("\n");
+    punishmentListTextarea.value = punishments.join("\n");
+  }
 
-    // Prüfen, ob Punkte >= 10 (für Strafe vergeben)
-    if(points >= 10) {
-      // Strafe zufällig auswählen
-      if(penalties.length > 0) {
-        const idx = Math.floor(Math.random() * penalties.length);
-        assignedPenalties.push(penalties[idx]);
-        alert(`Strafe vergeben: ${penalties[idx].name}`);
-        // Punkte nach Strafe auf 0 zurücksetzen
-        points = 0;
-      }
+  // Punkte und Session
+  let totalPoints = 0;
+
+  function resetSession() {
+    totalPoints = 0;
+    totalPointsSpan.textContent = totalPoints;
+    punishmentMsg.textContent = "";
+  }
+
+  // Strafe ziehen nach 10 Punkten
+  function checkPunishment() {
+    if (totalPoints >= 10) {
+      const punishments = getPunishments();
+      const index = Math.floor(Math.random() * punishments.length);
+      punishmentMsg.textContent = "Strafe: " + punishments[index];
+      // Punkte nach 10 auf 1 statt auf 0 zurücksetzen
+      totalPoints = totalPoints - 9;
+      totalPointsSpan.textContent = totalPoints;
+    } else {
+      punishmentMsg.textContent = "";
     }
+  }
 
-    updateSessionUI();
-  };
+  // Einstellungen aus Textareas lesen
+  function getVideos() {
+    return videoListTextarea.value.split("\n").filter(l => l.trim().length > 0);
+  }
+  function getErrors() {
+    return errorListTextarea.value.split("\n").filter(l => l.includes(";")).map(l => l.trim());
+  }
+  function getPunishments() {
+    return punishmentListTextarea.value.split("\n").filter(l => l.trim().length > 0);
+  }
 
-  // Nächstes Video ziehen
-  nextVideoBtn.onclick = () => {
-    if(videos.length === 0) {
-      alert('Keine Videos in der Liste.');
+  // Speichern Button
+  saveSettingsBtn.addEventListener("click", () => {
+    const videos = getVideos();
+    const errors = getErrors();
+    const punishments = getPunishments();
+    saveData(videos, errors, punishments);
+    populateVideoSelect(videos);
+    alert("Einstellungen gespeichert.");
+  });
+
+  // Punkte hinzufügen Button
+  addPointsBtn.addEventListener("click", () => {
+    const val = parseInt(errorPointsInput.value);
+    if (isNaN(val) || val <= 0) {
+      alert("Bitte eine positive Punktzahl eingeben.");
       return;
     }
-    // Zufälliges Video auswählen
-    const idx = Math.floor(Math.random() * videos.length);
-    currentVideo = videos[idx];
-    points = 0;
-    assignedPenalties = [];
-    updateSessionUI();
-  };
+    totalPoints += val;
+    totalPointsSpan.textContent = totalPoints;
+    checkPunishment();
+  });
 
-  // View Umschalten
-  btnSession.onclick = () => {
-    sessionView.classList.remove('hidden');
-    settingsView.classList.add('hidden');
-  };
-  btnSettings.onclick = () => {
-    settingsView.classList.remove('hidden');
-    sessionView.classList.add('hidden');
-    updateSettingsUI();
-  };
+  // Session beenden
+  endSessionBtn.addEventListener("click", () => {
+    alert("Session beendet. Punkte: " + totalPoints);
+    resetSession();
+  });
 
   // Initialisierung
   function init() {
-    initData();
-    btnSession.click();
-    updateSessionUI();
+    const { videos, errors, punishments } = loadData();
+    fillSettingsTextareas(videos, errors, punishments);
+    populateVideoSelect(videos);
+    resetSession();
   }
 
   init();
-})();
 </script>
-
 </body>
 </html>
